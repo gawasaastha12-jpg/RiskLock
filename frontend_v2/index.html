@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RiskLock — AI Risk Manager</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Space Grotesk', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              teal: '#2dd4bf',
+              magenta: '#c026d3',
+              amber: '#fbbf24',
+              blue: '#60a5fa',
+              rose: '#f43f5e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- CDNs for WebGL and Animation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+  <style>
+    /* Premium dark UI defaults */
+    html, body {
+      background-color: #030712;
+      color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      scroll-behavior: auto;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #030712;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+
+    /* Glassmorphism panel styling */
+    .glass-card {
+      background: rgba(8, 12, 24, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Monospace HUD markers */
+    .hud-label {
+      font-family: 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    /* Pinned 3D viewport canvas */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1 !important;
+      pointer-events: none;
+    }
+
+    /* Overlay for text and sections */
+    #scroll-container {
+      position: relative;
+      z-index: 10 !important;
+    }
+
+    /* SVG Overlay for projected leader lines */
+    #svg-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2 !important;
+      pointer-events: none;
+    }
+
+    /* Explicit content element layers to prevent layering context bleed-through */
+    .glass-card, .text-glass-panel, .sticky, .scene-content {
+      position: relative;
+      z-index: 20 !important;
+    }
+
+    /* Cinematic cuts & transition overlays */
+    #glitch-overlay {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      z-index: 45;
+      pointer-events: none;
+      mix-blend-mode: difference;
+    }
+
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      z-index: 45;
+      pointer-events: none;
+    }
+
+    #wipe-overlay {
+      position: fixed;
+      inset: 0;
+      background: #030712;
+      z-index: 45;
+      pointer-events: none;
+      clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+    }
+
+    /* Chevron Animation */
+    @keyframes bounce-slow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(8px); }
+    }
+    .animate-bounce-slow {
+      animation: bounce-slow 2s infinite ease-in-out;
+    }
+
+    /* Runway aircraft moving dashes */
+    @keyframes runway-move {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-20px); }
+    }
+    .runway-animation {
+      background-image: repeating-linear-gradient(90deg, #fbbf24, #fbbf24 10px, transparent 10px, transparent 20px);
+      animation: runway-move 0.6s linear infinite;
+    }
+
+    /* Reusable glassmorphic panel for text legibility */
+    .text-glass-panel {
+      background: rgba(6, 6, 10, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 24px;
+      padding: 28px 36px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Radial Vignette to darken space behind main text */
+    .radial-vignette {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 140%;
+      height: 140%;
+      background: radial-gradient(circle, rgba(3, 7, 18, 0.9) 0%, rgba(3, 7, 18, 0.55) 45%, transparent 100%);
+      z-index: -1;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Fallback Background -->
+  <div id="fallback-bg" class="fixed inset-0 z-0 bg-gradient-to-tr from-slate-950 via-gray-950 to-indigo-950 opacity-100 transition-opacity duration-1000"></div>
+
+  <!-- Pinned 3D Viewport -->
+  <div id="canvas-container">
+    <canvas id="three-canvas" class="w-full h-full"></canvas>
+  </div>
+
+  <!-- SVG Overlay for HUD Connector Lines -->
+  <svg id="svg-overlay">
+    <!-- Lines dynamically drawn in JS -->
+  </svg>
+
+  <!-- Cinematic Transition Overlays -->
+  <div id="glitch-overlay"></div>
+  <div id="flash-overlay"></div>
+  <div id="wipe-overlay"></div>
+
+  <!-- Scroll Container -->
+  <div id="scroll-container">
+
+    <!-- SCENE 1: THE NEURAL METROPOLIS (HERO) -->
+    <section class="min-h-screen flex flex-col justify-between items-center px-6 py-12 relative pointer-events-none select-none">
+      <div class="mt-8 pointer-events-auto">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-blue/30 bg-brand-blue/10 text-xs font-semibold text-brand-blue tracking-wider uppercase font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-brand-blue animate-pulse"></span>
+          RAZORPAY AI BUILDATHON — TRACK 02 · AI RISK MANAGER
+        </span>
+      </div>
+
+      <div class="max-w-4xl text-center pointer-events-auto mt-20 relative">
+        <div class="radial-vignette"></div>
+        <h1 class="text-5xl md:text-7xl font-bold leading-tight tracking-tight text-white mb-6">
+          RiskLock <br/>
+          <span class="bg-gradient-to-r from-brand-blue via-brand-teal to-brand-magenta bg-clip-text text-transparent">
+            Fraud-Spike Detector
+          </span>
+        </h1>
+        <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
+          One engine. Four safeguards, working every transaction.
+        </p>
+      </div>
+
+      <div class="flex flex-col items-center gap-2 text-gray-500 font-mono text-xs uppercase tracking-widest mt-12">
+        <span>Scroll down to enter</span>
+        <svg class="w-5 h-5 animate-bounce-slow text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </section>
+
+    <!-- SCENE 2: THE PROBLEM (DISCONNECTION) -->
+    <section class="min-h-[250vh] relative px-6 py-20 flex flex-col justify-start">
+      <div class="sticky top-20 max-w-xl self-start pointer-events-auto z-30 text-glass-panel border border-brand-rose/30">
+        <h2 class="text-[10px] uppercase font-mono tracking-widest text-brand-rose font-bold mb-2">Scene 02 / The Crisis</h2>
+        <h3 class="text-3xl md:text-4xl font-bold text-white mb-6">The Trust Gap</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">
+          Every flagged transaction raises the same three questions — and most systems can't answer any of them.
+        </p>
+      </div>
+
+      <div class="relative w-full max-w-xl self-end space-y-40 mt-[30vh]">
+        <!-- Problem Card 1 -->
+        <div id="problem-card-1" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 left-0 w-2.5 h-full bg-brand-rose"></div>
+          <h4 class="text-lg font-bold text-white mb-2">Black-Box Scoring</h4>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            A probability with no explanation is not a decision anyone can defend.
+          </p>
+        </div>
+
+        <!-- Problem Card 2 -->
+        <div id="problem-card-2" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 left-0 w-2.5 h-full bg-brand-rose"></div>
+          <h4 class="text-lg font-bold text-white mb-2">Invisible Bias</h4>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            A model can discriminate quietly for months before anyone notices the pattern.
+          </p>
+        </div>
+
+        <!-- Problem Card 3 -->
+        <div id="problem-card-3" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 left-0 w-2.5 h-full bg-brand-rose"></div>
+          <h4 class="text-lg font-bold text-white mb-2">Silent Drift</h4>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            Fraud patterns change. Most systems don't know when they've stopped working.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 3: THE SOLUTION (COPILOT CONNECTS) -->
+    <section class="min-h-screen flex items-center justify-center px-6 py-20 relative">
+      <div class="max-w-3xl text-center glass-card p-10 md:p-14 rounded-[36px] border border-white/10 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-blue via-brand-teal to-brand-magenta"></div>
+        <h2 class="text-[10px] uppercase font-mono tracking-widest text-brand-teal font-bold mb-3">Scene 03 / Convergence</h2>
+        <h3 class="text-3xl md:text-5xl font-bold text-white mb-6">One Engine, Four Safeguards.</h3>
+        <p class="text-gray-300 text-base md:text-lg leading-relaxed max-w-xl mx-auto font-light">
+          RiskLock scores every transaction, explains the decision, checks itself for bias, and watches its own reliability — before a human ever sees it.
+        </p>
+      </div>
+    </section>
+
+    <!-- SCENE 4: WHY UNIQUE (DOMAIN AGENTS + RAG) -->
+    <section class="min-h-[400vh] relative px-6 py-20 flex flex-col justify-start">
+      <div class="sticky top-20 max-w-xl self-start z-30 pointer-events-auto text-glass-panel border border-brand-magenta/30">
+        <h2 class="text-[10px] uppercase font-mono tracking-widest text-brand-magenta font-bold mb-2">Scene 04 / Nodes</h2>
+        <h3 class="text-3xl md:text-4xl font-bold text-white mb-6">Specialized Safeguards</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">
+          Four distinct intelligence safeguards working autonomously every transaction, with built-in guardrails and human escalation routes.
+        </p>
+      </div>
+
+      <div class="relative w-full max-w-xl self-end space-y-96 mt-[30vh]">
+        <!-- Agent 1 Panel -->
+        <div id="agent-panel-1" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-brand-amber/10 rounded-bl-full pointer-events-none"></div>
+          <span class="hud-label text-[10px] text-brand-amber font-bold block mb-1.5">DETECTION</span>
+          <h4 class="text-xl font-bold text-white mb-3">Detection</h4>
+          <p class="text-sm text-gray-400 leading-relaxed mb-4">
+            Scores every transaction in real time with a calibrated XGBoost model, catching 98.8% of held-out fraud cases.
+          </p>
+          <div class="text-[10px] font-mono text-brand-amber border border-brand-amber/20 bg-brand-amber/5 px-3 py-1.5 rounded-lg inline-block">
+            Calibrated XGBoost (98.8% Recall)
+          </div>
+        </div>
+
+        <!-- Agent 2 Panel -->
+        <div id="agent-panel-2" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-brand-magenta/10 rounded-bl-full pointer-events-none"></div>
+          <span class="hud-label text-[10px] text-brand-magenta font-bold block mb-1.5">EXPLAINABILITY</span>
+          <h4 class="text-xl font-bold text-white mb-3">Explainability</h4>
+          <p class="text-sm text-gray-400 leading-relaxed mb-4">
+            Generates a plain-English reason for every flagged transaction from live SHAP feature attributions — no black box.
+          </p>
+          <div class="text-[10px] font-mono text-brand-magenta border border-brand-magenta/20 bg-brand-magenta/5 px-3 py-1.5 rounded-lg inline-block">
+            Live SHAP Attributions
+          </div>
+        </div>
+
+        <!-- Agent 3 Panel -->
+        <div id="agent-panel-3" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-brand-teal/10 rounded-bl-full pointer-events-none"></div>
+          <span class="hud-label text-[10px] text-brand-teal font-bold block mb-1.5">FAIRNESS</span>
+          <h4 class="text-xl font-bold text-white mb-3">Fairness</h4>
+          <p class="text-sm text-gray-400 leading-relaxed mb-4">
+            Audits every decision by customer segment. Found and fixed an 18.25x friction disparity — down to 7.91x — at zero added cost.
+          </p>
+          <div class="text-[10px] font-mono text-brand-teal border border-brand-teal/20 bg-brand-teal/5 px-3 py-1.5 rounded-lg inline-block">
+            18.25x → 7.91x Disparity Reduced
+          </div>
+        </div>
+
+        <!-- Agent 4 Panel -->
+        <div id="agent-panel-4" class="glass-card p-8 rounded-3xl relative overflow-hidden transition-all duration-300">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-brand-blue/10 rounded-bl-full pointer-events-none"></div>
+          <span class="hud-label text-[10px] text-brand-blue font-bold block mb-1.5">DRIFT</span>
+          <h4 class="text-xl font-bold text-white mb-3">Drift</h4>
+          <p class="text-sm text-gray-400 leading-relaxed mb-4">
+            Monitors live feature distributions with PSI tracking, stress-tested to confirm the alarm actually fires under real shift.
+          </p>
+          <div class="text-[10px] font-mono text-brand-blue border border-brand-blue/20 bg-brand-blue/5 px-3 py-1.5 rounded-lg inline-block">
+            PSI Drift Monitoring
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 5: THE DIFFERENTIATOR CLIMAX -->
+    <section class="min-h-screen flex flex-col items-center justify-center px-6 py-20 relative select-none">
+      <div class="max-w-2xl text-center space-y-4">
+        <h2 id="diff-title-1" class="text-lg font-mono text-brand-teal tracking-widest uppercase opacity-0">
+          Connecting the Dots
+        </h2>
+        <h2 id="diff-title-2" class="text-2xl md:text-3xl font-mono text-brand-magenta tracking-widest uppercase opacity-0">
+          Aggregating Context
+        </h2>
+        <h1 id="diff-title-3" class="text-4xl md:text-6xl font-black text-white uppercase tracking-wider opacity-0">
+          The Aha Moment
+        </h1>
+      </div>
+    </section>
+
+    <!-- SCENE 6: CTA (READY TO GLIMPSE) -->
+    <section class="min-h-screen flex flex-col justify-center items-center px-6 py-20 relative">
+      <div class="max-w-2xl text-center space-y-8 z-30 relative">
+        <div class="radial-vignette"></div>
+        <h2 class="text-5xl md:text-7xl font-bold tracking-tight text-white leading-none">
+          Ready to see it decide?
+        </h2>
+        <p class="text-gray-400 text-sm md:text-base leading-relaxed max-w-md mx-auto font-light">
+          Walk through a real flagged transaction.
+        </p>
+
+        <div class="pt-4 flex flex-col items-center gap-4">
+          <!-- Runway CTA Button -->
+          <a href="http://localhost:8000" class="relative px-12 py-4 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-extrabold uppercase tracking-wider text-xs rounded-full shadow-[0_16px_36px_rgba(139,92,246,0.4)] hover:shadow-[0_20px_52px_rgba(139,92,246,0.6)] hover:scale-[1.02] transition-all overflow-hidden group select-none block w-64 text-center">
+            <!-- Moving runway yellow line -->
+            <div class="absolute inset-0 bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center overflow-hidden pointer-events-none">
+              <div class="absolute inset-x-0 top-1.5 h-[1px] bg-slate-700/50" />
+              <div class="absolute inset-x-0 bottom-1.5 h-[1px] bg-slate-700/50" />
+              <div class="w-[200%] h-[2px] absolute top-1/2 -translate-y-1/2 runway-animation"></div>
+            </div>
+            
+            <span class="relative z-10 block transition-transform duration-300 group-hover:translate-x-3">
+              ENTER THE CONSOLE
+            </span>
+
+            <!-- Airplane icon -->
+            <div class="absolute z-20 top-1/2 -translate-y-1/2 left-4 pointer-events-none text-white opacity-0 group-hover:opacity-100 group-hover:translate-x-36 transition-all duration-1000 ease-out">
+              <svg class="w-4 h-4 transform rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 1 0-3-3L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.3.3c-.4.4-.4 1.1 0 1.5L9 12l-4 4H3l-1 1v2l1 1h2l1-1v-2l4-4 3.7 5.7c.4.4 1.1.4 1.5 0l.3-.3c.4-.3.6-.8.5-1.3Z" />
+              </svg>
+            </div>
+          </a>
+
+          <!-- GitHub Secondary Link -->
+          <a href="https://github.com" target="_blank" class="text-xs font-mono text-gray-500 hover:text-white uppercase tracking-widest transition-colors pt-2">
+            View Source on GitHub
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- WebGL/Three.js/GSAP Controller Script -->
+  <script>
+    // --------------------------------------------------------------------------------
+    // Setup and Scene Definition
+    // --------------------------------------------------------------------------------
+    
+    // Register GSAP ScrollTrigger
+    gsap.registerPlugin(ScrollTrigger);
+
+    const canvas = document.getElementById('three-canvas');
+    const container = document.getElementById('canvas-container');
+    const svgOverlay = document.getElementById('svg-overlay');
+
+    let scene, camera, renderer;
+    let grid, core, towers = [], lines = [], particles = [];
+    let CC_Glyphs, SM_Glyphs, FI_Glyphs, MG_Glyphs; // Scene 4 holographic glyph structures
+    
+    // Define Domain coordinates
+    const DOMAINS = {
+      customer_care: { name: 'Detection', tag: 'DETECTION', color: '#fbbf24', pos: new THREE.Vector3(-15, 0, -15), colorHex: 0xfbbf24 },
+      social:        { name: 'Explainability', tag: 'EXPLAINABILITY', color: '#c026d3', pos: new THREE.Vector3(15, 0, -15), colorHex: 0xc026d3 },
+      finance:       { name: 'Fairness', tag: 'FAIRNESS', color: '#2dd4bf', pos: new THREE.Vector3(15, 0, 15), colorHex: 0x2dd4bf },
+      general:       { name: 'Drift', tag: 'DRIFT', color: '#60a5fa', pos: new THREE.Vector3(-15, 0, 15), colorHex: 0x60a5fa }
+    };
+
+    // Camera waypoints matching the new scenes
+    const CAMERA_WAYPOINTS = [
+      { pos: new THREE.Vector3(0, 30, 45), look: new THREE.Vector3(0, 0, 0) },     // Scene 1: Hero
+      { pos: new THREE.Vector3(-12, 3.5, 26), look: new THREE.Vector3(6, 1, -6) },  // Scene 2: Problem
+      { pos: new THREE.Vector3(0, 36, 52), look: new THREE.Vector3(0, 0, 0) },     // Scene 3: Solution
+      { pos: new THREE.Vector3(-19, 8, -8), look: new THREE.Vector3(-15, 4, -15) }, // Scene 4: CC agent focus
+      { pos: new THREE.Vector3(0, 35, 45), look: new THREE.Vector3(0, 0, 0) },     // Scene 5: Differentiator
+      { pos: new THREE.Vector3(0, 2, 5), look: new THREE.Vector3(0, 1, 0) }        // Scene 6: CTA (Close push)
+    ];
+
+    // Settings driven by GSAP timeline transitions
+    const state = {
+      scrollProgress: 0,
+      towersActive: [true, true, true, true], // Start dim, dim to dark on transition
+      particleFlowSpeed: 0.1,
+      corePulseSpeed: 1,
+      coreEmissiveIntensity: 0.3,
+      shieldOpacity: 0,
+      shockwaveScale: 0.1,
+      shockwaveOpacity: 0,
+      activeTowerIndex: -1, // Scene 4 agent close-ups
+      darkOverlayOpacity: 0
+    };
+
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      CAMERA_WAYPOINTS[0].pos.set(0, 38, 55);
+      CAMERA_WAYPOINTS[2].pos.set(0, 45, 60);
+      CAMERA_WAYPOINTS[4].pos.set(0, 42, 55);
+    }
+
+    // --------------------------------------------------------------------------------
+    // Three.js Initialization
+    // --------------------------------------------------------------------------------
+    function init() {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x030712, 0.015);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+      camera.position.copy(CAMERA_WAYPOINTS[0].pos);
+      camera.lookAt(CAMERA_WAYPOINTS[0].look);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
+
+      // Hide WebGL fallback background
+      document.getElementById('fallback-bg').style.opacity = '0';
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.12);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x60a5fa, 0.5);
+      dirLight.position.set(0, 50, 10);
+      scene.add(dirLight);
+
+      // Core light
+      const coreLight = new THREE.PointLight(0x3b82f6, 2, 80);
+      scene.add(coreLight);
+
+      // Ground Grid Helper
+      grid = new THREE.GridHelper(120, 60, 0x1f2937, 0x111827);
+      grid.position.y = -0.01;
+      grid.material.opacity = 0.55;
+      grid.material.transparent = true;
+      scene.add(grid);
+
+      // 1. Central Core: Management Brain
+      const coreGeo = new THREE.IcosahedronGeometry(4, 1);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x3b82f6,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.6
+      });
+      core = new THREE.Mesh(coreGeo, coreMat);
+      scene.add(core);
+
+      // Inner glowing core
+      const innerCoreGeo = new THREE.SphereGeometry(1.8, 16, 16);
+      const innerCoreMat = new THREE.MeshBasicMaterial({
+        color: 0x60a5fa,
+        transparent: true,
+        opacity: 0.8
+      });
+      const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+      core.add(innerCore);
+
+      // Core Glow Sprite
+      const coreGlow = createGlowSprite(0x60a5fa, 8);
+      core.add(coreGlow);
+
+      // Shockwave Ring (Scene 6 Climax)
+      const shockwaveGeo = new THREE.RingGeometry(0.1, 10, 64);
+      const shockwaveMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending
+      });
+      const shockwave = new THREE.Mesh(shockwaveGeo, shockwaveMat);
+      shockwave.rotation.x = Math.PI / 2;
+      scene.add(shockwave);
+      state.shockwaveMesh = shockwave;
+
+      // 2. Domain Towers
+      const domainKeys = Object.keys(DOMAINS);
+      domainKeys.forEach((key, index) => {
+        const dom = DOMAINS[key];
+        
+        const towerGroup = new THREE.Group();
+        towerGroup.position.copy(dom.pos);
+        scene.add(towerGroup);
+
+        const towerHeight = 10;
+        const boxGeo = new THREE.BoxGeometry(3, towerHeight, 3);
+        const boxMat = new THREE.MeshBasicMaterial({
+          color: 0x090d16,
+          transparent: true,
+          opacity: 0.82
+        });
+        const boxMesh = new THREE.Mesh(boxGeo, boxMat);
+        boxMesh.position.y = towerHeight / 2;
+        towerGroup.add(boxMesh);
+
+        const edges = new THREE.EdgesGeometry(boxGeo);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: dom.colorHex,
+          transparent: true,
+          opacity: 0.35
+        });
+        const wireframe = new THREE.LineSegments(edges, lineMat);
+        wireframe.position.y = towerHeight / 2;
+        towerGroup.add(wireframe);
+
+        const spriteGlow = createGlowSprite(dom.colorHex, 4.5);
+        spriteGlow.position.y = towerHeight;
+        towerGroup.add(spriteGlow);
+
+        towers.push({
+          group: towerGroup,
+          wireframe: wireframe,
+          glow: spriteGlow,
+          baseColor: dom.colorHex,
+          name: dom.name
+        });
+
+        // 3. Neural Pathway Lines (from tower to core)
+        const curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(dom.pos.x, 0.5, dom.pos.z),
+          new THREE.Vector3(dom.pos.x * 0.4, 3, dom.pos.z * 0.4),
+          new THREE.Vector3(0, 0, 0)
+        );
+
+        const points = curve.getPoints(30);
+        const pathGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const pathMat = new THREE.LineBasicMaterial({
+          color: dom.colorHex,
+          transparent: true,
+          opacity: 0.08
+        });
+        const pathLine = new THREE.Line(pathGeo, pathMat);
+        scene.add(pathLine);
+
+        lines.push({
+          line: pathLine,
+          curve: curve,
+          color: dom.colorHex
+        });
+
+        // 4. Flowing Connection Particles
+        const particleCount = isMobile ? 8 : 15;
+        const particleGeo = new THREE.BufferGeometry();
+        const pPositions = new Float32Array(particleCount * 3);
+        const pOffsets = [];
+
+        for (let i = 0; i < particleCount; i++) {
+          pOffsets.push(Math.random());
+          pPositions[i * 3] = dom.pos.x;
+          pPositions[i * 3 + 1] = 0;
+          pPositions[i * 3 + 2] = dom.pos.z;
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+        const pTexture = createParticleTexture(dom.colorHex);
+        const pMat = new THREE.PointsMaterial({
+          size: 1.2,
+          map: pTexture,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+
+        const pSystem = new THREE.Points(particleGeo, pMat);
+        scene.add(pSystem);
+
+        particles.push({
+          system: pSystem,
+          offsets: pOffsets,
+          curve: curve,
+          count: particleCount
+        });
+      });
+
+      // 5. Scene 4 Holographic Domain Glyphs
+      setupDomainGlyphs();
+
+      window.addEventListener('resize', onWindowResize);
+      setupScrollAnimations();
+    }
+
+    // Initialize Scene 4 Node glyph structures
+    function setupDomainGlyphs() {
+      // Customer Care: Amber neuron spheres cluster
+      CC_Glyphs = new THREE.Group();
+      CC_Glyphs.position.copy(DOMAINS.customer_care.pos).setY(11);
+      for (let i = 0; i < 4; i++) {
+        const s = new THREE.Mesh(
+          new THREE.SphereGeometry(0.5, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xfbbf24, wireframe: true })
+        );
+        s.position.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+        CC_Glyphs.add(s);
+      }
+      CC_Glyphs.scale.set(0.01, 0.01, 0.01);
+      scene.add(CC_Glyphs);
+
+      // Social Media: Magenta sine wave ribbon glyphs
+      SM_Glyphs = new THREE.Group();
+      SM_Glyphs.position.copy(DOMAINS.social.pos).setY(11);
+      const wavePoints = [];
+      for (let x = -2; x <= 2; x += 0.2) {
+        wavePoints.push(new THREE.Vector3(x, Math.sin(x * 3) * 0.8, 0));
+      }
+      const waveGeo = new THREE.BufferGeometry().setFromPoints(wavePoints);
+      const waveLine = new THREE.Line(waveGeo, new THREE.LineBasicMaterial({ color: 0xc026d3, linewidth: 2 }));
+      SM_Glyphs.add(waveLine);
+      SM_Glyphs.scale.set(0.01, 0.01, 0.01);
+      scene.add(SM_Glyphs);
+
+      // Finance: Teal spikes cluster
+      FI_Glyphs = new THREE.Group();
+      FI_Glyphs.position.copy(DOMAINS.finance.pos).setY(11);
+      for (let i = 0; i < 3; i++) {
+        const spikePoints = [new THREE.Vector3(0, 0, 0), new THREE.Vector3((i - 1) * 1.2, 2.5, (Math.random() - 0.5) * 1.5)];
+        const spikeGeo = new THREE.BufferGeometry().setFromPoints(spikePoints);
+        const spikeLine = new THREE.Line(spikeGeo, new THREE.LineBasicMaterial({ color: 0x2dd4bf, linewidth: 2.5 }));
+        FI_Glyphs.add(spikeLine);
+      }
+      FI_Glyphs.scale.set(0.01, 0.01, 0.01);
+      scene.add(FI_Glyphs);
+
+      // Management Brain: Electric blue concentric rings
+      MG_Glyphs = new THREE.Group();
+      MG_Glyphs.position.copy(DOMAINS.general.pos).setY(11);
+      for (let i = 0; i < 2; i++) {
+        const ringGeo = new THREE.RingGeometry(1 + i * 0.6, 1.1 + i * 0.6, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, side: THREE.DoubleSide, wireframe: true });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        MG_Glyphs.add(ring);
+      }
+      MG_Glyphs.scale.set(0.01, 0.01, 0.01);
+      scene.add(MG_Glyphs);
+    }
+
+    // Helper: Glow sprite drawing on internal HTML5 canvas
+    function createGlowSprite(colorHex, size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+
+      const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      const hexStr = '#' + colorHex.toString(16).padStart(6, '0');
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.2, hexStr + '88');
+      gradient.addColorStop(0.5, hexStr + '22');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({
+        map: texture,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(size, size, 1);
+      return sprite;
+    }
+
+    // Helper: Particle dot texture
+    function createParticleTexture(colorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+
+      const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      const hexStr = '#' + colorHex.toString(16).padStart(6, '0');
+      gradient.addColorStop(0, '#ffffff');
+      gradient.addColorStop(0.3, hexStr);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 32, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --------------------------------------------------------------------------------
+    // GSAP ScrollTrigger Sequence Setup
+    // --------------------------------------------------------------------------------
+    function setupScrollAnimations() {
+      // Master Scroll timeline maps progress linearly to camera waypoints
+      const masterTL = gsap.timeline({
+        scrollTrigger: {
+          trigger: "#scroll-container",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: 1.2,
+          onUpdate: (self) => {
+            state.scrollProgress = self.progress;
+          }
+        }
+      });
+
+      // Animate Camera positions across scenes (interpolate via ScrollTrigger timeline nodes)
+      CAMERA_WAYPOINTS.forEach((wp, index) => {
+        if (index === 0) return; // Starting state
+
+        const startPercent = (index - 1) / (CAMERA_WAYPOINTS.length - 1);
+        const endPercent = index / (CAMERA_WAYPOINTS.length - 1);
+
+        masterTL.to(camera.position, {
+          x: wp.pos.x,
+          y: wp.pos.y,
+          z: wp.pos.z,
+          ease: "sine.inOut"
+        }, startPercent * 100);
+      });
+
+      // Scene Breaks using specific ScrollTrigger timelines for cinematic cuts
+
+      // Scene 1 Break: Glitch Transition at end of Hero
+      ScrollTrigger.create({
+        trigger: "#scroll-container",
+        start: "top+=15% top",
+        end: "top+=20% top",
+        onEnter: () => triggerScene1Break(),
+        onLeaveBack: () => restoreScene1()
+      });
+
+      // Scene 2 Break: Violence Surge / Power Ripple
+      ScrollTrigger.create({
+        trigger: "#scroll-container",
+        start: "top+=42% top",
+        end: "top+=48% top",
+        onEnter: () => triggerScene2Break(),
+        onLeaveBack: () => undoScene2Break()
+      });
+
+      // Scene 3 Break: Sequential Zoom Wipes
+      ScrollTrigger.create({
+        trigger: "#scroll-container",
+        start: "top+=58% top",
+        end: "top+=64% top",
+        onEnter: () => triggerScene3Break()
+      });
+
+      // Staged focusing triggers during Scene 4 agent close-ups
+      // Index mapping: CC (0), Social (1), Finance (2), General (3)
+      masterTL.to(state, { activeTowerIndex: 0, duration: 2 }, 60);
+      masterTL.to(state, { activeTowerIndex: 1, duration: 2 }, 66);
+      masterTL.to(state, { activeTowerIndex: 2, duration: 2 }, 72);
+      masterTL.to(state, { activeTowerIndex: 3, duration: 2 }, 78);
+      masterTL.to(state, { activeTowerIndex: -1, duration: 1 }, 84); // Reset focus
+
+      // Climax Convergence Shockwave Climax (Scene 4 -> Scene 5 transition)
+      ScrollTrigger.create({
+        trigger: "#scroll-container",
+        start: "top+=82% top",
+        end: "top+=88% top",
+        onEnter: () => triggerClimaxShockwave()
+      });
+
+      // DOM Text scroll triggers
+      gsap.to("#problem-card-1", {
+        scrollTrigger: { trigger: "#problem-card-1", start: "top 70%", end: "top 40%", scrub: true },
+        opacity: 1, y: -20, scale: 1.02
+      });
+      gsap.to("#problem-card-2", {
+        scrollTrigger: { trigger: "#problem-card-2", start: "top 70%", end: "top 40%", scrub: true },
+        opacity: 1, y: -20, scale: 1.02
+      });
+      gsap.to("#problem-card-3", {
+        scrollTrigger: { trigger: "#problem-card-3", start: "top 70%", end: "top 40%", scrub: true },
+        opacity: 1, y: -20, scale: 1.02
+      });
+
+      // Scene 5 climax title stack build
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: "#diff-title-1",
+          start: "top 80%",
+          end: "bottom 30%",
+          scrub: true
+        }
+      })
+      .to("#diff-title-1", { opacity: 1, scale: 1.1, duration: 1 })
+      .to("#diff-title-2", { opacity: 1, scale: 1.1, duration: 1 })
+      .to("#diff-title-3", { opacity: 1, scale: 1.15, duration: 1.5 });
+    }
+
+    // --------------------------------------------------------------------------------
+    // Cinematic Scene breaks transitions
+    // --------------------------------------------------------------------------------
+    
+    // Scene 1 -> 2: Glitch and hard snap dark
+    function triggerScene1Break() {
+      const tl = gsap.timeline();
+      // Flashing difference color overlay for glitch effect
+      tl.to("#glitch-overlay", { opacity: 0.9, duration: 0.05, repeat: 5, yoyo: true })
+        .to("#glitch-overlay", { opacity: 0, duration: 0.1 });
+
+      // Kill pathways, dim core
+      state.towersActive = [false, false, false, false];
+      state.particleFlowSpeed = 0.01;
+      state.corePulseSpeed = 0.3;
+      state.coreEmissiveIntensity = 0.05;
+      
+      // Animate grid dimming
+      gsap.to(grid.material, { opacity: 0.15, duration: 0.8 });
+    }
+
+    function restoreScene1() {
+      state.towersActive = [true, true, true, true];
+      state.particleFlowSpeed = 0.1;
+      state.corePulseSpeed = 1.0;
+      state.coreEmissiveIntensity = 0.3;
+      gsap.to(grid.material, { opacity: 0.55, duration: 0.8 });
+    }
+
+    // Scene 2 -> 3: Violent surge and bright flash ripple
+    function triggerScene2Break() {
+      // Violent surge flickering towers
+      const tl = gsap.timeline();
+      towers.forEach(t => {
+        tl.to(t.glow.material, { opacity: 0, duration: 0.05, repeat: 3, yoyo: true })
+          .to(t.glow.material, { opacity: 0.9, duration: 0.1 });
+      });
+
+      // Bright expanding screen flash
+      tl.to("#flash-overlay", { opacity: 1, duration: 0.15 })
+        .to("#flash-overlay", { opacity: 0, duration: 0.7, ease: "power2.out" });
+
+      // Reignite pathways in sequence (Solution connects)
+      setTimeout(() => {
+        state.towersActive = [true, true, true, true];
+        state.particleFlowSpeed = 0.25;
+        state.corePulseSpeed = 2.8;
+        state.coreEmissiveIntensity = 1.0;
+        gsap.to(grid.material, { opacity: 0.65, duration: 1.0 });
+      }, 150);
+    }
+
+    function undoScene2Break() {
+      state.towersActive = [false, false, false, false];
+      state.particleFlowSpeed = 0.01;
+      state.corePulseSpeed = 0.3;
+      gsap.to(grid.material, { opacity: 0.15, duration: 0.8 });
+    }
+
+    // Scene 3 -> 4: Sequential zoom zoom wipe
+    function triggerScene3Break() {
+      const tl = gsap.timeline();
+      // Diagonal wipe cinematic transition
+      tl.to("#wipe-overlay", { clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)", duration: 0.4, ease: "power2.in" })
+        .to("#wipe-overlay", { clipPath: "polygon(100% 0, 100% 0, 100% 100%, 100% 100%)", duration: 0.4, ease: "power2.out" });
+
+      // Trigger sequential tower zooming / glowing
+      towers.forEach((t, index) => {
+        gsap.to(t.glow.material, { opacity: 1.0, duration: 0.2, delay: index * 0.15 });
+      });
+    }
+
+    // Scene 4 -> 5: Climax shocking ripple
+    function triggerClimaxShockwave() {
+      // Emits expanding Shockwave and bright flash
+      state.shockwaveScale = 0.1;
+      state.shockwaveOpacity = 0.95;
+      
+      gsap.to(state, {
+        shockwaveScale: 32,
+        duration: 2.5,
+        ease: "power2.out"
+      });
+      gsap.to(state, {
+        shockwaveOpacity: 0,
+        duration: 2.2,
+        delay: 0.3
+      });
+
+      // Bright screen flash overlay
+      gsap.timeline()
+        .to("#flash-overlay", { opacity: 0.9, duration: 0.1 })
+        .to("#flash-overlay", { opacity: 0, duration: 0.8, ease: "power2.out" });
+
+      // Core spinning speeds up to max
+      state.corePulseSpeed = 4.2;
+    }
+
+    // --------------------------------------------------------------------------------
+    // Render Loop & State Updates
+    // --------------------------------------------------------------------------------
+    let clock = new THREE.Clock();
+
+    function animateScene() {
+      requestAnimationFrame(animateScene);
+
+      const elapsed = clock.getElapsedTime();
+      const delta = clock.getDelta();
+
+      // Calculate safe zone opacity for Hero scene
+      const safeZoneOpacity = Math.min(1.0, Math.max(0.0, (state.scrollProgress - 0.05) / 0.15));
+
+      // 1. Rotate Core and apply safe zone opacity
+      if (core) {
+        core.rotation.y = elapsed * 0.15 * state.corePulseSpeed;
+        core.rotation.x = elapsed * 0.08 * state.corePulseSpeed;
+        
+        const coreScale = (1 + Math.sin(elapsed * 2.5 * state.corePulseSpeed) * 0.08) * (0.01 + 0.99 * safeZoneOpacity);
+        core.scale.set(coreScale, coreScale, coreScale);
+
+        // Core materials transparency animation
+        core.material.opacity = 0.6 * safeZoneOpacity;
+        if (core.children[0] && core.children[0].material) {
+          core.children[0].material.opacity = 0.8 * safeZoneOpacity;
+        }
+        if (core.children[1] && core.children[1].material) {
+          core.children[1].material.opacity = 0.8 * safeZoneOpacity;
+        }
+      }
+
+      // 2. Adjust fog & lights dynamically based on progress and focus
+      scene.fog.color.setHex(state.darkOverlayOpacity > 0 ? 0x010205 : 0x030712);
+
+      // 3. Update Domain towers visual states (glow + scale) - Reverted Hero scene suppression
+      towers.forEach((t, i) => {
+        let targetScale = 1;
+        let opacityMultiplier = 0.25;
+
+        if (state.towersActive[i]) {
+          opacityMultiplier = 0.85;
+        }
+
+        // Close-up focuses (Scene 4 Agent details)
+        if (state.activeTowerIndex === i) {
+          targetScale = 1.28;
+          opacityMultiplier = 1.0;
+          t.wireframe.material.color.setHex(0xffffff); // Highlight active wireframe top
+        } else {
+          t.wireframe.material.color.setHex(t.baseColor);
+        }
+
+        const currentScale = t.group.scale.x;
+        const nextScale = THREE.MathUtils.lerp(currentScale, targetScale, 0.08);
+        t.group.scale.set(nextScale, nextScale, nextScale);
+        t.wireframe.material.opacity = THREE.MathUtils.lerp(t.wireframe.material.opacity, 0.45 * opacityMultiplier, 0.08);
+        t.glow.material.opacity = THREE.MathUtils.lerp(t.glow.material.opacity, 0.95 * opacityMultiplier, 0.08);
+      });
+
+      // 4. Animate Scene 4 Holographic Glyphs (Scale & Rotate)
+      animateHolographicGlyphs(elapsed);
+
+      // 5. Update Connecting Line path opacities - Reverted Hero scene suppression
+      lines.forEach((l, i) => {
+        const targetOpacity = state.towersActive[i] ? 0.42 : 0.04;
+        l.line.material.opacity = THREE.MathUtils.lerp(l.line.material.opacity, targetOpacity, 0.08);
+      });
+
+      // 6. Update flowing connection particles (Exclusion zone via positional screen projection)
+      particles.forEach((p, index) => {
+        const isActive = state.towersActive[index];
+        const speed = isActive ? state.particleFlowSpeed : 0.01;
+        const positions = p.system.geometry.attributes.position.array;
+        const tempV = new THREE.Vector3();
+
+        for (let i = 0; i < p.count; i++) {
+          p.offsets[i] -= speed * 0.05;
+          if (p.offsets[i] < 0) p.offsets[i] = 1.0;
+
+          const point = p.curve.getPointAt(p.offsets[i]);
+          let finalX = point.x;
+          let finalY = point.y;
+          let finalZ = point.z;
+
+          // Exclude connection particles that pass exactly behind the centered text safe zone box
+          if (state.scrollProgress < 0.18) {
+            tempV.copy(point).project(camera);
+            const inFront = tempV.z > -1 && tempV.z < 1;
+            const inSafeZone = inFront && Math.abs(tempV.x) < 0.35 && Math.abs(tempV.y) < 0.22;
+            if (inSafeZone) {
+              finalZ = -2000; // hide behind camera/fog
+            }
+          }
+
+          positions[i * 3] = finalX;
+          positions[i * 3 + 1] = finalY;
+          positions[i * 3 + 2] = finalZ;
+        }
+        p.system.geometry.attributes.position.needsUpdate = true;
+
+        const targetParticleOpacity = isActive ? 0.95 : 0.12;
+        p.system.material.opacity = THREE.MathUtils.lerp(p.system.material.opacity, targetParticleOpacity, 0.08);
+      });
+
+      // 7. Update Scene 6 Climax Shockwave
+      if (state.shockwaveMesh) {
+        state.shockwaveMesh.scale.set(state.shockwaveScale, state.shockwaveScale, 1);
+        state.shockwaveMesh.material.opacity = state.shockwaveOpacity;
+      }
+
+      // 8. Update camera look direction and SVG leader lines projection
+      updateCameraTracking();
+      updateTowerLabels();
+
+      renderer.render(scene, camera);
+    }
+
+    // Dynamic floating HTML tower labels - Reverted Hero scene suppression
+    function updateTowerLabels() {
+      towers.forEach((t, i) => {
+        const pos = t.group.position.clone().setY(12);
+        pos.project(camera);
+        const x = (pos.x *  .5 + .5) * window.innerWidth;
+        const y = (pos.y * -.5 + .5) * window.innerHeight;
+        
+        let labelEl = document.getElementById(`tower-label-${i}`);
+        if (!labelEl) {
+          labelEl = document.createElement('div');
+          labelEl.id = `tower-label-${i}`;
+          labelEl.className = "absolute px-3 py-1.5 rounded-lg border text-[10px] font-bold font-mono tracking-wider bg-slate-950/90 shadow-xl pointer-events-none whitespace-nowrap z-30 transition-opacity duration-300";
+          const domKeys = Object.keys(DOMAINS);
+          const domData = DOMAINS[domKeys[i]];
+          labelEl.innerHTML = `${domData.tag}`;
+          labelEl.style.color = domData.color;
+          labelEl.style.borderColor = `${domData.color}50`;
+          document.body.appendChild(labelEl);
+        }
+        
+        labelEl.style.left = `${x}px`;
+        labelEl.style.top = `${y}px`;
+        labelEl.style.transform = "translate(-50%, -100%)";
+        
+        if (pos.z > 1 || x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
+          labelEl.style.opacity = 0;
+        } else {
+          labelEl.style.opacity = 1;
+        }
+      });
+    }
+
+    // Animate and scale Scene 4 domain glyph structures dynamically
+    function animateHolographicGlyphs(elapsed) {
+      // Scale up based on active focused tower index
+      const ccScale = state.activeTowerIndex === 0 ? 1.0 : 0.01;
+      const smScale = state.activeTowerIndex === 1 ? 1.0 : 0.01;
+      const fiScale = state.activeTowerIndex === 2 ? 1.0 : 0.01;
+      const mgScale = state.activeTowerIndex === 3 ? 1.0 : 0.01;
+
+      CC_Glyphs.scale.lerp(new THREE.Vector3(ccScale, ccScale, ccScale), 0.08);
+      SM_Glyphs.scale.lerp(new THREE.Vector3(smScale, smScale, smScale), 0.08);
+      FI_Glyphs.scale.lerp(new THREE.Vector3(fiScale, fiScale, fiScale), 0.08);
+      MG_Glyphs.scale.lerp(new THREE.Vector3(mgScale, mgScale, mgScale), 0.08);
+
+      // Rotate individual structures
+      CC_Glyphs.rotation.y = elapsed * 0.4;
+      SM_Glyphs.rotation.x = elapsed * 0.3;
+      FI_Glyphs.rotation.z = elapsed * 0.5;
+      
+      // Converted rings rotate in opposite directions
+      MG_Glyphs.children[0].rotation.z = elapsed * 0.5;
+      if (MG_Glyphs.children[1]) {
+        MG_Glyphs.children[1].rotation.z = -elapsed * 0.7;
+      }
+
+      // Project matching leader line connections if any tower is active
+      clearHUDLines();
+      if (state.activeTowerIndex >= 0) {
+        const targetTowers = [DOMAINS.customer_care, DOMAINS.social, DOMAINS.finance, DOMAINS.general];
+        const activeDom = targetTowers[state.activeTowerIndex];
+        const glyphPos = activeDom.pos.clone().setY(11);
+        
+        drawHUDConnector(glyphPos, state.activeTowerIndex);
+      }
+    }
+
+    // Dynamic Screen Projection for HUD lines
+    function drawHUDConnector(pos3D, activeIndex) {
+      const cardIds = ["agent-panel-1", "agent-panel-2", "agent-panel-3", "agent-panel-4"];
+      const targetCard = document.getElementById(cardIds[activeIndex]);
+      if (!targetCard) return;
+
+      const screenPos = new THREE.Vector3().copy(pos3D);
+      screenPos.project(camera);
+
+      const x2 = (screenPos.x *  .5 + .5) * window.innerWidth;
+      const y2 = (screenPos.y * -.5 + .5) * window.innerHeight;
+
+      const rect = targetCard.getBoundingClientRect();
+      const x1 = rect.left + 6;
+      const y1 = rect.top + rect.height / 2;
+
+      if (x2 < 0 || x2 > window.innerWidth || y2 < 0 || y2 > window.innerHeight) return;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M ${x1} ${y1} L ${x2} ${y2}`);
+      path.setAttribute("stroke", activeIndex === 0 ? "#fbbf24" : activeIndex === 1 ? "#c026d3" : activeIndex === 2 ? "#2dd4bf" : "#60a5fa");
+      path.setAttribute("stroke-width", "1.2");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke-dasharray", "4 4");
+      svgOverlay.appendChild(path);
+
+      targetCard.style.borderColor = activeIndex === 0 ? "rgba(251, 191, 36, 0.4)" : activeIndex === 1 ? "rgba(192, 38, 211, 0.4)" : activeIndex === 2 ? "rgba(45, 212, 191, 0.4)" : "rgba(96, 165, 250, 0.4)";
+      targetCard.style.boxShadow = "0 0 24px rgba(255, 255, 255, 0.05)";
+    }
+
+    function clearHUDLines() {
+      svgOverlay.innerHTML = "";
+      const cards = ["agent-panel-1", "agent-panel-2", "agent-panel-3", "agent-panel-4"];
+      cards.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.borderColor = "";
+          el.style.boxShadow = "";
+        }
+      });
+    }
+
+    // Camera targeting look-at easing interpolation
+    let currentLookAt = new THREE.Vector3().copy(CAMERA_WAYPOINTS[0].look);
+    function updateCameraTracking() {
+      const segmentCount = CAMERA_WAYPOINTS.length - 1;
+      const segmentIndex = Math.min(Math.floor(state.scrollProgress * segmentCount), segmentCount - 1);
+      const segmentPercent = (state.scrollProgress * segmentCount) - segmentIndex;
+
+      const targetLookAt = new THREE.Vector3().lerpVectors(
+        CAMERA_WAYPOINTS[segmentIndex].look,
+        CAMERA_WAYPOINTS[segmentIndex + 1].look,
+        segmentPercent
+      );
+
+      currentLookAt.lerp(targetLookAt, 0.06);
+      camera.lookAt(currentLookAt);
+    }
+
+    // --------------------------------------------------------------------------------
+    // Startup Execution
+    // --------------------------------------------------------------------------------
+    try {
+      init();
+      animateScene();
+    } catch (e) {
+      console.error("WebGL Initialisation failed, loading fallback background.", e);
+      document.getElementById('fallback-bg').style.opacity = '1';
+    }
+  </script>
+</body>
+</html>

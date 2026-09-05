@@ -1,0 +1,192 @@
+/* Scrollytelling stylesheet for RiskLock */
+
+.scrollytelling-container {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #030712;
+  color: #f3f4f6;
+  font-family: 'Space Grotesk', sans-serif;
+  overflow-x: clip;
+}
+
+/* Canvas container for Three.js / React Three Fiber */
+.canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1 !important;
+  pointer-events: none;
+}
+
+/* Content wrapper that scrolls over the fixed 3D canvas */
+.content-wrapper {
+  position: relative;
+  z-index: 20 !important;
+  width: 100%;
+}
+
+/* Global Content Element Layering */
+.glass-card, .text-glass-panel, .sticky, .scene-content, .scroll-cue, .hero-badge {
+  position: relative;
+  z-index: 20 !important;
+}
+
+/* Generic Section styling */
+.scene {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 24px;
+  pointer-events: none;
+}
+
+.scene-content {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+/* Hero Section */
+.hero-scene {
+  justify-content: space-between;
+  text-align: center;
+  padding-top: 120px;
+  padding-bottom: 60px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: rgba(96, 165, 250, 0.1);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #60a5fa;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 24px;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 5rem;
+  }
+}
+
+.hero-subhead {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: #9ca3af;
+  max-w: 600px;
+  margin: 0 auto 40px auto;
+}
+
+.scroll-cue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #4b5563;
+}
+
+.scroll-cue svg {
+  color: #60a5fa;
+  animation: scroll-bounce 2s infinite ease-in-out;
+}
+
+@keyframes scroll-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+/* Glassmorphic Cards */
+.glass-card {
+  background: rgba(8, 12, 24, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Problem Scene Cards */
+.problem-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 40px;
+}
+
+@media (min-width: 768px) {
+  .problem-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.section-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .section-title {
+    font-size: 2.75rem;
+  }
+}
+
+/* Reusable glassmorphic panel for text legibility */
+.text-glass-panel {
+  background: rgba(6, 6, 10, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 24px;
+  padding: 28px 36px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* Radial Vignette to darken space behind main text */
+.radial-vignette {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(3, 7, 18, 0.9) 0%, rgba(3, 7, 18, 0.55) 45%, transparent 100%);
+  z-index: -1;
+  pointer-events: none;
+}
