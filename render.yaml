@@ -35,7 +35,7 @@ services:
     region: oregon
     branch: main
     rootDir: frontend_v2
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist/public
     autoDeploy: true
     routes:
