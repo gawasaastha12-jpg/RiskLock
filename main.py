@@ -291,6 +291,15 @@ def generate_reason_code(txn_data: dict, top_features: List[Dict[str, Any]], tie
             
     return " | ".join(reasons[:2])
 
+@app.get("/")
+def root_info():
+    return {
+        "service": "RiskLock Fraud Decision Engine API",
+        "version": "1.0.0",
+        "status": "online",
+        "health": "/health"
+    }
+
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
