@@ -3,11 +3,11 @@ import { motion, AnimatePresence, animate } from "framer-motion";
 import { 
   RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowLeft, Mail, 
   Megaphone, TrendingUp, Settings, Search, Bell, User, Plus, 
-  Menu, Download, AlertTriangle, FileSpreadsheet, FileDown, Activity, LogOut, Compass, Edit3, Lock, Sparkles
+  Menu, Download, AlertTriangle, FileSpreadsheet, FileDown, Activity, LogOut, Compass, Edit3, Lock, Sparkles, Home
 } from "lucide-react";
 import { toast } from "sonner";
 import { DOMAIN_COLORS } from "@/const";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import ReasoningTraceViewer from "../components/ReasoningTraceViewer";
 import EditResponseModal from "../components/EditResponseModal";
 
@@ -1350,12 +1350,28 @@ export default function Dashboard() {
       {/* 1. Header (Top Bar) */}
       <header className="h-16 border-b border-white/5 bg-gray-950/80 backdrop-blur-xl px-6 flex items-center justify-between z-40 relative">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-blue-500 shadow-md">
-            <Activity className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-black text-sm uppercase tracking-tight text-white hidden sm:inline">
-            RISKLOCK CONSOLE
-          </span>
+          <Link 
+            href="/" 
+            className="flex items-center gap-3 group cursor-pointer transition-opacity hover:opacity-90" 
+            title="Return to Scrollytelling Home"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-blue-500 shadow-md group-hover:scale-105 transition-transform">
+              <Activity className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-black text-sm uppercase tracking-tight text-white hidden sm:inline">
+              RISKLOCK CONSOLE
+            </span>
+          </Link>
+
+          {/* Quick Home Button */}
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 hover:border-blue-500/30 transition-all text-xs font-mono group"
+            title="Return to Home Experience"
+          >
+            <Home className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider hidden md:inline">Home</span>
+          </Link>
         </div>
 
         {/* Center: Search Box */}
@@ -1430,6 +1446,18 @@ export default function Dashboard() {
           }`}
         >
           <div className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
+            {/* Home Navigation Link */}
+            <Link
+              href="/"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 border border-transparent transition-all mb-2 group"
+              title="Return to 3D Scrollytelling Home"
+            >
+              <Home className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+              {!isSidebarCollapsed && <span>Home Story</span>}
+            </Link>
+
+            <div className="h-px w-full bg-white/5 my-1" />
+
             {/* All option */}
             <button
               onClick={() => {
