@@ -144,7 +144,7 @@ cp .env.example .env
 # Run FastAPI backend
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
-The backend will be live at `http://127.0.0.1:8000` (`/health` and `/docs` interactive Swagger).
+The backend is live at - https://risklock-2tb7.onrender.com
 
 ### 2. Frontend Setup
 ```bash
@@ -198,6 +198,8 @@ RiskLock includes a pre-configured [`render.yaml`](render.yaml) supporting Rende
 RiskLock was designed and built solo for the **Razorpay Hackathon**, under **Track 02 — AI Risk Manager**, covering the full stack end-to-end: the fraud-decision ML pipeline (calibration, cost modeling, fairness optimization), the FastAPI backend, the React operational console, and the production security architecture.
 
 **Author:** [gawasaastha12-jpg](https://github.com/gawasaastha12-jpg)
+
+ ## THIS SITE IS LIVE AT - https://risklock-1.onrender.com/
 
 ---
 
